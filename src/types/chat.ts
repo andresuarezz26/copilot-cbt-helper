@@ -11,3 +11,11 @@ export interface ChatState {
   isLoading: boolean;
   error: string | null;
 }
+
+export interface Session {
+  id: string;
+  title: string;
+  createdAt: Date;
+  updatedAt: Date;
+  messages: Message[];
+}

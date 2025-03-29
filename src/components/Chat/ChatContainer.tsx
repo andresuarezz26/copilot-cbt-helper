@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
-import { Message, ChatState } from '@/types/chat';
+import { Message, ChatState, Session } from '@/types/chat';
 import { getChatCompletion, getOpenAIKey, setOpenAIKey } from '@/services/openai';
 import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
@@ -12,6 +12,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Bot } from 'lucide-react';
+import { 
+  createSession, 
+  getSessions, 
+  updateSessionMessages,
+  generateSessionTitle,
+  updateSession
+} from '@/services/sessions';
 
 const WELCOME_MESSAGE: Message = {
   id: uuidv4(),
@@ -20,27 +27,75 @@ const WELCOME_MESSAGE: Message = {
   timestamp: new Date()
 };
 
-const ChatContainer = () => {
+interface ChatContainerProps {
+  activeSession?: Session | null;
+  onSessionUpdated?: (session: Session) => void;
+  showSessionManagement?: boolean;
+}
+
+const ChatContainer = ({ 
+  activeSession = null, 
+  onSessionUpdated,
+  showSessionManagement = false 
+}: ChatContainerProps) => {
   const [chatState, setChatState] = useState<ChatState>({
-    messages: [WELCOME_MESSAGE],
+    messages: activeSession?.messages || [WELCOME_MESSAGE],
     isLoading: false,
     error: null
   });
   
   const [apiKey, setApiKey] = useState<string>(getOpenAIKey());
   const [isApiKeySet, setIsApiKeySet] = useState<boolean>(!!getOpenAIKey());
+  const [currentSession, setCurrentSession] = useState<Session | null>(activeSession);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Update messages when active session changes
+  useEffect(() => {
+    if (activeSession) {
+      setChatState(prev => ({
+        ...prev,
+        messages: activeSession.messages.length > 0 ? activeSession.messages : [WELCOME_MESSAGE],
+      }));
+      setCurrentSession(activeSession);
+    }
+  }, [activeSession]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatState.messages]);
+  
+  // Save messages to session if we have one
+  useEffect(() => {
+    if (currentSession && chatState.messages.length > 0) {
+      const updatedSession = updateSessionMessages(currentSession.id, chatState.messages);
+      
+      // If this is the second message (first user message), generate a title
+      if (chatState.messages.length === 2 && chatState.messages[1].role === 'user') {
+        const title = generateSessionTitle(chatState.messages);
+        updateSession(currentSession.id, { title });
+      }
+      
+      if (updatedSession && onSessionUpdated) {
+        onSessionUpdated(updatedSession);
+      }
+    }
+  }, [chatState.messages, currentSession]);
 
   const handleSendMessage = async (content: string) => {
     if (!isApiKeySet) {
       toast.error("Please set your OpenAI API key first");
       return;
+    }
+
+    // Create a session if we don't have one
+    if (!currentSession) {
+      const newSession = createSession();
+      setCurrentSession(newSession);
+      if (onSessionUpdated) {
+        onSessionUpdated(newSession);
+      }
     }
 
     // Add user message
@@ -98,7 +153,7 @@ const ChatContainer = () => {
 
   if (!isApiKeySet) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]">
+      <div className="flex items-center justify-center min-h-[calc(100vh-12rem)]">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-xl flex items-center gap-2">
@@ -146,8 +201,8 @@ const ChatContainer = () => {
   }
 
   return (
-    <div className="chat-container">
-      <div className="chat-messages">
+    <div className="chat-container h-full flex flex-col">
+      <div className="chat-messages flex-1 overflow-y-auto pb-4">
         {chatState.messages.map((message) => (
           <ChatMessage key={message.id} message={message} />
         ))}
@@ -172,7 +227,7 @@ const ChatContainer = () => {
         )}
         <div ref={messagesEndRef} />
       </div>
-      <div className="chat-input-area">
+      <div className="chat-input-area pt-2">
         <ChatInput onSendMessage={handleSendMessage} isLoading={chatState.isLoading} />
       </div>
     </div>

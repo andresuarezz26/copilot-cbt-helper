@@ -1,74 +1,166 @@
 
-import { useUser, useAuth } from "@clerk/clerk-react";
-import Header from "@/components/Layout/Header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
-import { toast } from "sonner";
+import { useState, useEffect } from 'react';
+import { UserButton, useAuth } from '@clerk/clerk-react';
+import { useNavigate } from 'react-router-dom';
+import Header from '@/components/Layout/Header';
+import ChatContainer from '@/components/Chat/ChatContainer';
+import SessionList from '@/components/Sessions/SessionList';
+import { getSessions, createSession } from '@/services/sessions';
+import { Session } from '@/types/chat';
+import { Button } from '@/components/ui/button';
+import { PlusCircle, MessageSquare, LayoutSidebar } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 
 const Dashboard = () => {
-  const { user } = useUser();
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isSignedIn } = useAuth();
   const navigate = useNavigate();
-
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (isLoaded && !isSignedIn) {
-      toast.error("You need to be signed in to view this page");
-      navigate("/sign-in");
-    }
-  }, [isLoaded, isSignedIn, navigate]);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [activeSession, setActiveSession] = useState<Session | null>(null);
+  const [showSidebar, setShowSidebar] = useState(true);
   
-  // Get user role from metadata
-  const userRole = user?.publicMetadata?.role as string || "user";
-  const isTherapist = userRole === "therapist";
-
-  if (!isLoaded || !isSignedIn) {
-    return <div className="flex min-h-screen items-center justify-center">Loading...</div>;
-  }
-
+  // Check if user is logged in
+  useEffect(() => {
+    if (!isSignedIn) {
+      navigate('/sign-in');
+    }
+  }, [isSignedIn, navigate]);
+  
+  // Load sessions from local storage
+  useEffect(() => {
+    const loadedSessions = getSessions();
+    setSessions(loadedSessions);
+    
+    // Set active session to the first one or create a new one if none exist
+    if (loadedSessions.length > 0) {
+      setActiveSession(loadedSessions[0]);
+    } else {
+      const newSession = createSession({
+        id: uuidv4(),
+        content: "Hi, I'm CoPilot, your CBT therapy assistant. How are you feeling today?",
+        role: 'assistant',
+        timestamp: new Date()
+      });
+      setSessions([newSession]);
+      setActiveSession(newSession);
+    }
+  }, []);
+  
+  const handleCreateNewSession = () => {
+    const newSession = createSession({
+      id: uuidv4(),
+      content: "Hi, I'm CoPilot, your CBT therapy assistant. How are you feeling today?",
+      role: 'assistant',
+      timestamp: new Date()
+    });
+    setSessions([newSession, ...sessions]);
+    setActiveSession(newSession);
+  };
+  
+  const handleSessionUpdated = (updatedSession: Session) => {
+    setSessions(prev => {
+      const newSessions = prev.map(session => 
+        session.id === updatedSession.id ? updatedSession : session
+      );
+      // Sort sessions by updatedAt, newest first
+      return newSessions.sort((a, b) => 
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
+    });
+  };
+  
+  const handleRestartSession = (session: Session) => {
+    // Create a new session with the same title but only the welcome message
+    const restartedSession = createSession({
+      id: uuidv4(),
+      content: "Hi, I'm CoPilot, your CBT therapy assistant. How are you feeling today?",
+      role: 'assistant',
+      timestamp: new Date()
+    });
+    // Update title to show it's a restart
+    const newTitle = `${session.title} (Restarted)`;
+    handleSessionUpdated({
+      ...restartedSession,
+      title: newTitle
+    });
+    setSessions([restartedSession, ...sessions]);
+    setActiveSession(restartedSession);
+  };
+  
   return (
     <div className="flex min-h-screen flex-col bg-copilot-background">
-      <Header />
+      <Header>
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="icon"
+            className="md:hidden"
+            onClick={() => setShowSidebar(!showSidebar)}
+          >
+            <LayoutSidebar className="h-4 w-4" />
+          </Button>
+          <UserButton />
+        </div>
+      </Header>
+      
       <main className="flex-1 container mx-auto px-4 py-6">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+        <div className="flex gap-6 h-[calc(100vh-8rem)]">
+          {/* Session sidebar */}
+          <div 
+            className={`${
+              showSidebar ? 'block' : 'hidden'
+            } md:block w-full md:w-72 lg:w-80 shrink-0 border-r pr-4`}
+          >
+            <SessionList 
+              sessions={sessions}
+              activeSessionId={activeSession?.id || null}
+              onSelectSession={setActiveSession}
+              onCreateNewSession={handleCreateNewSession}
+              onRestartSession={handleRestartSession}
+            />
+          </div>
           
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile</CardTitle>
-                <CardDescription>Your account information</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <p><span className="font-medium">Name:</span> {user?.fullName || "Not provided"}</p>
-                  <p><span className="font-medium">Email:</span> {user?.primaryEmailAddress?.emailAddress}</p>
-                  <p><span className="font-medium">Role:</span> {isTherapist ? "Therapist" : "User"}</p>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Chat area */}
+          <div className="flex-1 bg-[#F8FAFC] rounded-xl border shadow-sm overflow-hidden relative">
+            {!showSidebar && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="absolute top-4 left-4 md:hidden flex items-center gap-1 z-10"
+                onClick={() => setShowSidebar(true)}
+              >
+                <MessageSquare className="h-4 w-4" />
+                <span>Sessions</span>
+              </Button>
+            )}
             
-            {isTherapist ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Therapist Portal</CardTitle>
-                  <CardDescription>Access your therapist tools</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p>You have access to therapist features.</p>
-                </CardContent>
-              </Card>
+            {activeSession ? (
+              <div className="h-full flex flex-col">
+                <div className="px-4 py-3 border-b">
+                  <h2 className="font-medium truncate">{activeSession.title}</h2>
+                  <div className="text-xs text-muted-foreground">
+                    Created {new Date(activeSession.createdAt).toLocaleString()}
+                  </div>
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  <ChatContainer 
+                    activeSession={activeSession} 
+                    onSessionUpdated={handleSessionUpdated}
+                    showSessionManagement={true}
+                  />
+                </div>
+              </div>
             ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Therapy Sessions</CardTitle>
-                  <CardDescription>Your recent therapy sessions</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p>Your recent sessions will appear here.</p>
-                </CardContent>
-              </Card>
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <h3 className="text-lg font-medium mb-2">No active session</h3>
+                  <p className="text-muted-foreground mb-4">Select a session or create a new one</p>
+                  <Button onClick={handleCreateNewSession} className="bg-copilot-primary hover:bg-copilot-dark">
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    New Session
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         </div>
