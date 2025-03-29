@@ -1,8 +1,13 @@
 
 import Header from '@/components/Layout/Header';
 import ChatContainer from '@/components/Chat/ChatContainer';
+import { useAuth } from '@clerk/clerk-react';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
 const Index = () => {
+  const { isSignedIn } = useAuth();
+
   return (
     <div className="flex min-h-screen flex-col bg-copilot-background">
       <Header />
@@ -13,6 +18,17 @@ const Index = () => {
             <p className="text-muted-foreground">
               Talk with CoPilot about your thoughts and feelings. I'm here to help you apply CBT techniques.
             </p>
+            
+            {!isSignedIn && (
+              <div className="mt-4 space-x-4">
+                <Button asChild className="bg-copilot-primary hover:bg-copilot-dark">
+                  <Link to="/sign-up">Create a Free Account</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link to="/sign-in">Sign In</Link>
+                </Button>
+              </div>
+            )}
           </div>
           <div className="bg-[#F8FAFC] rounded-xl border shadow-sm overflow-hidden">
             <ChatContainer />
