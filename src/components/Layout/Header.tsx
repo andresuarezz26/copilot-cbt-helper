@@ -1,4 +1,5 @@
 
+import { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { Bot } from 'lucide-react';
 import { SignInButton, SignUpButton, UserButton, useAuth } from '@clerk/clerk-react';
@@ -7,9 +8,10 @@ import { Link } from 'react-router-dom';
 
 interface HeaderProps {
   className?: string;
+  children?: ReactNode;
 }
 
-const Header = ({ className }: HeaderProps) => {
+const Header = ({ className, children }: HeaderProps) => {
   const { isSignedIn } = useAuth();
 
   return (
@@ -30,7 +32,7 @@ const Header = ({ className }: HeaderProps) => {
               <Button variant="ghost" asChild>
                 <Link to="/dashboard">Dashboard</Link>
               </Button>
-              <UserButton afterSignOutUrl="/" />
+              {children}
             </>
           ) : (
             <>

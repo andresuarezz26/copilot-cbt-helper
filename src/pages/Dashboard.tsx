@@ -8,7 +8,7 @@ import SessionList from '@/components/Sessions/SessionList';
 import { getSessions, createSession } from '@/services/sessions';
 import { Session } from '@/types/chat';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, MessageSquare, LayoutSidebar } from 'lucide-react';
+import { PlusCircle, MessageSquare, SidebarOpen } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 const Dashboard = () => {
@@ -96,7 +96,7 @@ const Dashboard = () => {
             className="md:hidden"
             onClick={() => setShowSidebar(!showSidebar)}
           >
-            <LayoutSidebar className="h-4 w-4" />
+            <SidebarOpen className="h-4 w-4" />
           </Button>
           <UserButton />
         </div>
