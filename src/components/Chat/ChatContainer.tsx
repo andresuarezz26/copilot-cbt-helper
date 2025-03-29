@@ -13,9 +13,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Bot } from 'lucide-react';
 
-// Add this dependency
-<lov-add-dependency>uuid@latest</lov-add-dependency>
-
 const WELCOME_MESSAGE: Message = {
   id: uuidv4(),
   content: "Hi, I'm CoPilot, your CBT therapy assistant. How are you feeling today?",
